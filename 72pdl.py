@@ -1,3 +1,4 @@
+from pathlib import Path
 import requests
 import os,sys
 
@@ -15,7 +16,7 @@ except ImportError:
     print("Needed module 'logging' is not installed.")
     sys.exit(1)
 try:
-    import Configparser
+    import configparser
 except ImportError:
     print("Needed module 'configparser' is not installed.")
     sys.exit(1)
@@ -28,19 +29,6 @@ completedsave = list()
 completed = list()
 visited = bool
 
-# Read already finished Crawls
-fileCompleted = "completed.txt"
-with open(fileCompleted) as foCompleted:
-    for line in foCompleted:
-        completed.append(line.rstrip())
-
-#Setup Logging
-LogFilename='720dl.log'
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-loghandler = logging.handlers.RotatingFileHandler(LogFilename, maxBytes=500000, backupCount=5)
-logger.addHandler(loghandler)
-
 #Write Configs
 def cfgfile():
     if len(config.read('720pier.ru.ini')) == 0:  # if config file isn't found, create it
@@ -51,7 +39,9 @@ def cfgfile():
         config.add_section('Notification')
         config.set('Default', 'logrotate', 'True')
         config.set('Default', 'logrotatebytes', '500000')
-        config.set('Default', 'savedir', os.getcwd())
+        config.set('Default', 'rotatebackups', '5')
+        config.set('Default', 'savedir', Path.cwd())
+        config.set('Default', 'url', 'http://720pier.ru/search.php?search_id=active_topics&sr=topics&ot=1&pt=t&fid[]=46')
         config.set('Credentials', 'username', '<your 720pier.ru username>')
         config.set('Credentials', 'password', '<your 720pier.ru password>')
         config.set('Notification', '#Boxcar', 'boxcar://hostname')  # see more @ https://github.com/caronc/apprise
@@ -94,6 +84,38 @@ def cfgfile():
         config.write(cfgfile)
         cfgfile.close()
 
+#Get Configs
+config = configparser.ConfigParser()
+cfgfile()
+config.read('720pier.ru.ini')
+cfgLogrotate=config['Default']['logrotate']
+cfgLogrotateBytes=int(config['Default']['logrotatebytes'])
+cfgRotateBackups=config['Default']['rotatebackups']
+cfgSaveDir=Path(config['Default']['savedir'])
+cfgUsername=config['Credentials']['username']
+cfgPassword=config['Credentials']['password']
+cfgQbClient=config['Torrent']['qbclient']
+cfgQbCategory=config['Torrent']['category']
+cfgQbUsername=config['Torrent']['username']
+cfgQbPassword=config['Torrent']['password']
+cfgQbDownload=config['Torrent']['download']
+
+# Read already finished Crawls
+fileCompleted = "completed.txt"
+with open(fileCompleted) as foCompleted:
+    for line in foCompleted:
+        completed.append(line.rstrip())
+
+#Setup Logging
+LogFilename='720dl.log'
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+loghandler = logging.handlers.RotatingFileHandler(LogFilename, maxBytes=cfgLogrotateBytes, backupCount=cfgRotateBackups)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+loghandler.setFormatter(formatter)
+logger.addHandler(loghandler)
+
+
 #Notification System
 def messaging(title,body):
     apobj = apprise.Apprise()
@@ -104,42 +126,33 @@ def messaging(title,body):
             body=body,
         )
 
-#Get Configs
-config = configparser.ConfigParser()
-cfgfile()
-config.read('720pier.ru.ini')
-cfgLogrotate=config['Default']['logrotate']
-cfgLogrotateBytes=config['Default']['logrotatebytes']
-cfgUsername=config['Credentials']['username']
-cfgPassword=config['Credentials']['password']
-cfgQbClient=config['Torrent']['qbclient']
-cfgQbCategory=config['Torrent']['category']
-cfgQbUsername=config['Torrent']['username']
-cfgQbPassword=config['Torrent']['password']
-cfgQbDownload=config['Torrent']['download']
-
-
 # Set Firefox Environmental Variables
 options = Options();
 options.set_preference("browser.download.folderList",2);
 options.set_preference("browser.download.manager.showWhenStarting", False);
-options.set_preference("browser.download.dir",os.getcwd());
+options.set_preference("browser.download.dir",cfgSaveDir.name);
 options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/x-bittorrent,application/octet-stream");
 options.add_argument("--headless")
 browser = webdriver.Firefox(firefox_options=options)
+logger.info("Firefox Preferences set.")
 
 #Login to the page
-browser.get('http://720pier.ru/ucp.php?mode=login')
-assert '720pier' in browser.title
-elem = browser.find_element_by_id('username')
-elem.send_keys(cfgUsername)
-elem = browser.find_element_by_id('password')
-elem.send_keys(cfgPassword)
-elem = browser.find_element_by_name('login').click()
+try:
+    browser.get('http://720pier.ru/ucp.php?mode=login')
+    assert '720pier' in browser.title
+    logger.info("Loginpage opened.")
+    elem = browser.find_element_by_id('username')
+    elem.send_keys(cfgUsername)
+    elem = browser.find_element_by_id('password')
+    elem.send_keys(cfgPassword)
+    elem = browser.find_element_by_name('login').click()
+except:
+    logger.error("Loginpage couldn't be opened")
+    sys.exit(1)
 
 #Open the Last Topics
-#browser.get('http://720pier.ru/search.php?search_id=active_topics&sr=topics&ot=1&pt=t&fid[]=46')
-browser.get('http://720pier.ru/viewforum.php?f=88')
+browser.get('http://720pier.ru/search.php?search_id=active_topics&sr=topics&ot=1&pt=t&fid[]=46')
+#browser.get('http://720pier.ru/viewforum.php?f=88')
 
 #Find all Topics and their Links
 topics = browser.find_elements_by_class_name('topictitle')
@@ -148,18 +161,21 @@ for topic in topics:
         if c==str(topic.get_attribute('href')):
             visited=True
             completedsave.append(c)
+            logger.info("Topic has already been visited: %s", c)
     if not visited:
         topicstovisit.append(topic.get_attribute('href'))
         completedsave.append(topic.get_attribute('href'))
-    visited=False
+        logger.info("Topic added to list: %s", str(href))
+visited=False
 
 #Open Topics and download the torrent file
 for topic in topicstovisit:
     browser.get(topic)
     try:
         dl = browser.find_element_by_xpath('//*[@title="Download torrent"]').click()
+        logger.info("New download added", str(href))
     except:
-        print("No downloadable link found in: ", topic)
+        logger.error("No new Download found in: %s", str(topic))
 
 #Write the completed file
 with open(fileCompleted, "w") as foCompleted:
@@ -167,3 +183,4 @@ with open(fileCompleted, "w") as foCompleted:
         foCompleted.writelines(i + "\n")
 foCompleted.close()
 browser.quit()
+logger.info("Browser closed.")
