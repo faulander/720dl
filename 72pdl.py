@@ -1,5 +1,6 @@
 from pathlib import Path
 import requests
+import apprise
 import os,sys
 
 try:
@@ -83,6 +84,17 @@ def cfgfile():
         config.set('Torrent', 'download', 'True')  # Start Downloads immediately (yes/no)
         config.write(cfgfile)
         cfgfile.close()
+
+#Pushover Example
+def messaging(title,body):
+    apobj = apprise.Apprise()
+    if config['Notification']['Pushover']:
+        apobj.add(config['Notification']['Pushover'])
+        apobj.notify(
+            title=title,
+            body=body,
+        )
+
 
 #Get Configs
 config = configparser.ConfigParser()
@@ -175,6 +187,7 @@ for topic in topicstovisit:
     try:
         dl = browser.find_element_by_xpath('//*[@title="Download torrent"]').click()
         logger.info('Torrent extracted from: %s', topic)
+        messaging("New Torrent", "New torrent extracted.")
     except:
        logger.error("No new Download found in: %s", str(topic))
 
