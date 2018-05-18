@@ -165,17 +165,18 @@ for topic in topics:
     if not visited:
         topicstovisit.append(topic.get_attribute('href'))
         completedsave.append(topic.get_attribute('href'))
-        logger.info("Topic added to list: %s", str(href))
-visited=False
+        logger.info("Topic added to list: %s", topic.get_attribute('href'))
+    visited=False
 
 #Open Topics and download the torrent file
 for topic in topicstovisit:
     browser.get(topic)
+    logger.info('Trying: %s', topic)
     try:
         dl = browser.find_element_by_xpath('//*[@title="Download torrent"]').click()
-        logger.info("New download added", str(href))
+        logger.info('Torrent extracted from: %s', topic)
     except:
-        logger.error("No new Download found in: %s", str(topic))
+       logger.error("No new Download found in: %s", str(topic))
 
 #Write the completed file
 with open(fileCompleted, "w") as foCompleted:
