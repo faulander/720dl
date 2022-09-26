@@ -5,16 +5,17 @@ Webcrawler for 720pier.ru which downloads ALL torrentfiles from a given overview
 Doesn't re-download old torrents.
 
 ##Needs:
-- geckobrowser in Python binary directory. Download it here: https://github.com/mozilla/geckodriver/releases
+- geckobrowser in Python binary directory. Download it here: https://github.com/mozilla/geckodriver/releases or take the one from the repository.
+- pdm (https://github.com/pdm-project/pdm)
 
-##Installation:
-- pdm init
+## Installation:
+- clone the repo
 - pdm install
 
-##Docker:
+## Docker:
 - Coming
 
-##Features
+## Features:
 - Monitor 720pier.ru for new torrents
 - Send torrents to QBittorrent
 - Monitor Ratio on sent torrents
