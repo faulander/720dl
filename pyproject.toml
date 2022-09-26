@@ -1,0 +1,21 @@
+[project]
+name = "720pDL"
+version = "0.1"
+description = "A torrent file downloader for 720pier.ru"
+authors = [
+    {name = "Harald Fauland", email = "harald.fauland@gmail.com"},
+]
+dependencies = [
+    "selenium>=4.4.3",
+    "requests>=2.28.1",
+    "apprise>=1.0.0",
+]
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
+
+[tool]
+[tool.pdm]
