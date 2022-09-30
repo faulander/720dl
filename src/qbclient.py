@@ -9,7 +9,7 @@ class LoginRequired(Exception):
 
 class Client(object):
     """class to interact with qBittorrent WEB API"""
-    def __init__(self, url, verify=True):
+    def __init__(self, url, verify=True, basicAuthUsername="", basicAuthPassword=""):
         """
         Initialize the client
 
@@ -17,8 +17,9 @@ class Client(object):
         :param verify: Boolean to specify if SSL verification should be done.
                        Defaults to True.
         """
-        self.basicAuthUsername="seedit4me"
-        self.basicAuthPassword="Busc0pan1"
+
+        self.webUsername=basicAuthUsername
+        self.webPassword=basicAuthPassword
 
         if not url.endswith('/'):
             url += '/'
@@ -27,7 +28,11 @@ class Client(object):
 
         session = requests.Session()
         prefs_url = self.url + 'app/preferences'
-        check_prefs = session.get(prefs_url, auth=(self.basicAuthUsername, self.basicAuthPassword),verify=self.verify)
+        if not self.webUsername:
+            check_prefs = session.get(prefs_url,verify=self.verify)
+        else:
+            check_prefs = session.get(prefs_url, auth=(self.webUsername, self.webPassword),verify=self.verify)
+
         if check_prefs.status_code == 200:
             self._is_authenticated = True
             self.session = session
@@ -66,7 +71,7 @@ class Client(object):
         """
         return self._request(endpoint, 'post', data, **kwargs)
 
-    def _request(self, endpoint, method, data=None, auth=None, **kwargs):
+    def _request(self, endpoint, method, data=None, **kwargs):
         """
         Method to hanle both GET and POST requests.
 
@@ -84,9 +89,16 @@ class Client(object):
 
         kwargs['verify'] = self.verify
         if method == 'get':
-            request = self.session.get(final_url, auth=(self.basicAuthUsername, self.basicAuthPassword),**kwargs)
+            if not self.webUsername:
+                request = self.session.get(final_url, **kwargs)
+            else:
+                request = self.session.get(final_url, auth=(self.webUsername, self.webPassword), **kwargs)
         else:
-            request = self.session.post(final_url, data, auth, **kwargs)
+            if not self.webUsername:
+                request = self.session.post(final_url, data, **kwargs)
+            else:
+                request = self.session.post(final_url, data, auth=(self.webUsername, self.webPassword), **kwargs)
+
 
         request.raise_for_status()
         request.encoding = 'utf_8'
@@ -118,7 +130,7 @@ class Client(object):
         login = self.session.post(self.url + 'auth/login',
                                   data={'username': username,
                                         'password': password},
-                                  auth=(self.basicAuthUsername, self.basicAuthPassword),
+                                  auth=(self.webUsername, self.webPassword),
                                   verify=self.verify)
         if login.text == 'Ok.':
             self._is_authenticated = True
