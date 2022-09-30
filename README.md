@@ -4,8 +4,12 @@
 Webcrawler for 720pier.ru which downloads ALL torrentfiles from a given overview (seachresult, Category etc.) link or from RSS-Feeds.
 Doesn't re-download old torrents.
 
-##Needs:
+## Needs:
 - pdm (https://github.com/pdm-project/pdm)
+
+## Features:
+- Monitor 720pier.ru for new torrents
+- Send torrents to QBittorrent
 
 ## Installation:
 - clone the repo
@@ -16,10 +20,6 @@ Doesn't re-download old torrents.
 
 ## Docker:
 - If you know what you are doing, the Dockerfile is included
-
-## Features:
-- Monitor 720pier.ru for new torrents
-- Send torrents to QBittorrent
 
 ## 720pier.ru.ini
 [Default]
