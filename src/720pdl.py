@@ -1,12 +1,13 @@
-from asyncio.proactor_events import _ProactorBaseWritePipeTransport
 from pathlib import Path
-import requests
-import os,sys
+import os
+import sys
 from loguru import logger
-import configparser
-import pendulum as p
+import pendulum
 import feedparser
-
+import yaml
+import schedule
+import time
+from yaml.loader import BaseLoader
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
@@ -16,67 +17,42 @@ from selenium.webdriver.firefox.webdriver import WebDriver
 from qbclient import Client
 
 
-#Variable Definition
-topics = list()
-topicstovisit = list()
-completedsave = list()
-completed = list()
-fileCompleted = "completed.txt"
-today = p.now()
-
-logger.add("720pdl.log", format="{time} - {level} - {message}")
-
-
-
-#Write Configs
-def cfgfile():
-    if len(config.read('720pier.ru.ini')) == 0:  # if config file isn't found, create it
-        cfgfile = open("720pier.ru.ini", 'w')
-        config.add_section('Default')
-        config.add_section('Credentials')
-        config.add_section('Torrent')
-        config.set('Default', 'savedir', str(Path.cwd()))
-        config.set('Default', 'url', 'http://720pier.ru/search.php?search_id=active_topics&sr=topics&ot=1&pt=t&fid[]=46')
-        config.set('Default', 'useRSS', "yes")
-        config.set('Default', 'categories', '48')
-        config.set('Default', 'skipOlderThan', p.start_of("year").format("YYYY-MM-DD"))
-        config.set('Default', 'include', '')
-        config.set('Default', 'exclude', '')
-        config.set('Credentials', 'username', '<your 720pier.ru username>')
-        config.set('Credentials', 'password', '<your 720pier.ru password>')
-        config.set('Torrent', 'sendToQBittorrent', "no")
-        config.set('Torrent', 'qbclient', 'http://127.0.0.1:8080')  # WEB-Access for qBittorrent must be available
-        config.set('Torrent', 'category', '720pier')  # 
-        config.set('Torrent', 'login', 'admin')  # Login to qBittorrent Client
-        config.set('Torrent', 'password', 'admin')  # Password to qBittorrent Client
-        config.set('Torrent', 'BasicAuthLogin', '')  # Basic Auth
-        config.set('Torrent', 'BasicAuthPassword', '')  # Basic Auth
-        config.set('Torrent', 'startPaused', 'yes')  # Start Downloads immediately (yes/no)
-        config.write(cfgfile)
-        cfgfile.close()
-
-#Get Configs
-config = configparser.ConfigParser()
-cfgfile()
-config.read('720pier.ru.ini')
-cfgSaveDir=Path(config['Default']['savedir'])
-cfgURL=config['Default']['url']
-cfgUseRSS = config['Default'].getboolean('useRSS')
-cfgCategories = config['Default']['categories'].split(',')
-cfgSkipOlderThan = p.parse(config['Default']['skipOlderThan'])
-cfgInclude=config['Default']['include']
-cfgExclude=config['Default']['exclude']
-cfgUsername=config['Credentials']['username']
-cfgPassword=config['Credentials']['password']
-cfgSendToQb=config['Torrent'].getboolean('sendToQBittorrent')
-cfgQbClient=config['Torrent']['qbclient']
-cfgQbCategory=config['Torrent']['category']
-cfgQbUsername=config['Torrent']['login']
-cfgQbPassword=config['Torrent']['password']
-cfgBasicAuthLogin=config['Torrent']['BasicAuthLogin']
-cfgBasicAuthPassword=config['Torrent']['BasicAuthPassword']
-cfgQbDownload=config['Torrent'].getboolean('startPaused')
-
+def loadOrCreateCfgfile():
+    if os.path.isfile('720pier.ini.yml'):
+        with open('720pier.ini.yml', "r") as ini:
+            c = yaml.load(ini, Loader=BaseLoader)
+            #logger.debug(c)
+        return c
+        logger.info("INI File loaded")
+    else:
+        c = dict()
+        c['Default'] = dict()
+        c['Default']['savedir'] = str(Path.cwd())
+        c['Default']['baseURL'] = 'https://720pier.ru'
+        c['Default']['useRSS'] = False
+        c['Default']['categoriesToDownload'] = [48,]
+        c['Default']['skipOlderThan'] = today.start_of("year").format("YYYY-MM-DD")
+        c['Default']['include'] = ['',]
+        c['Default']['exclude'] = ['',]
+        c['Credentials'] = dict()
+        c['Credentials']['username'] = '<your 720pier.ru username>'
+        c['Credentials']['password'] = '<your 720pier.ru password>'
+        c['Torrent'] = dict()
+        c['Torrent']['sendToQBittorrent'] = False
+        c['Torrent']['qbClient'] = 'http://127.0.0.1:8080' # WEB-Access for qBittorrent must be available
+        c['Torrent']['category'] = '720pier'  # 
+        c['Torrent']['qbUsername'] = 'admin'  # Login to qBittorrent Client
+        c['Torrent']['qbPassword'] = 'admin'  # Password to qBittorrent Client
+        c['Torrent']['basicAuthUsername'] = ''  # Basic Auth
+        c['Torrent']['basicAuthPassword'] = '' # Basic Auth
+        c['Torrent']['startPaused'] = True  # Start Downloads immediately (yes/no)
+        c['CategoriesRatio'] = {
+            '720pier': {'stopAtRatio': -1, 'stopAtSeedingTime': -1},
+            }
+        with open('720pier.ini.yml', "w") as ini:
+            yaml.dump(c, ini, default_flow_style=False, sort_keys=False)
+        logger.error('Default config file created. Please adapt!')
+        sys.exit(1)
 
 def readFinishedCrawls():
     # Read already finished Crawls
@@ -84,8 +60,10 @@ def readFinishedCrawls():
         with open(fileCompleted, "r") as foCompleted:
             for line in foCompleted:
                 completed.append(line.rstrip())
+        return completed
     except FileNotFoundError:
         open(fileCompleted, "x")
+    logger.info("Completed file loaded")
 
 def scanForFiles():
     setOfFiles = set()
@@ -95,17 +73,17 @@ def scanForFiles():
         if file.endswith('.torrent'):
             setOfFiles.add(os.path.join(os.path.abspath(os.path.dirname(__file__)), file))
     return setOfFiles
+    logger.info("Scan for torrent files locally completed")
     
 def getNewTorrents():
     visited = bool
-    if cfgUsername == "<your 720pier.ru username>":
-        print("Please adapt 720pier.ru.ini to your needs")
+    if cfg['Credentials']["username"] == "<your 720pier.ru username>":
+        logger.error("Please adapt 720pier.ini.yml to your needs")
         sys.exit(1)
 
     # Set Firefox Environmental Variables
     options = Options()
     options.set_preference("browser.download.dir", os.path.abspath(os.path.dirname(__file__)))
-    #options.set_preference("browser.download.dir", cfgSaveDir.name)
     options.set_preference("browser.download.folderList", 2)
     options.set_preference("browser.download.manager.showWhenStarting", False)
     options.set_preference("browser.helperApps.neverAsk.saveToDisk","application/x-bittorrent,application/octet-stream")
@@ -120,16 +98,16 @@ def getNewTorrents():
     browser = WebDriver(service=service, options=options)
     logger.info("Firefox Preferences set.")
 
-
     #Login to the page
     try:
-        browser.get('https://720pier.ru/ucp.php?mode=login')
+        login = cfg['Default']['baseURL'] + "/ucp.php?mode=login"
+        browser.get(login)
         assert '720pier' in browser.title
         logger.info("Loginpage opened.")
         elem = browser.find_element(By.ID,'username')
-        elem.send_keys(cfgUsername)
+        elem.send_keys(cfg['Credentials']["username"])
         elem = browser.find_element(By.ID,'password')
-        elem.send_keys(cfgPassword)
+        elem.send_keys(cfg['Credentials']["password"])
         elem = browser.find_element(By.NAME,'login').click()
     except Exception as e:
         if hasattr(e, 'message'):
@@ -140,49 +118,46 @@ def getNewTorrents():
 
     browser.implicitly_wait(0.5)
 
-    try:
-        #Open the Last Topics
-        browser.get(cfgURL)
-    except Exception as e:
-        if hasattr(e, 'message'):
-            logger.error(e.message)
-        else:
-            logger.error(e)
-        sys.exit(1)
-
-
     #Find all Topics and their Links
     topics = list()
-    if not cfgUseRSS:
-        #read directly from web 
-        topics = browser.find_elements(By.CLASS_NAME,'topictitle')
-        for topic in topics:
-            #logger.debug(topic)
-            for c in completed:
-                if c==str(topic.get_attribute('href')):
-                    visited=True
-                    completedsave.append(c)
-                    logger.info(f"Topic has already been visited: {c}")
-            if not visited:
-                topicstovisit.append(topic.get_attribute('href'))
-                completedsave.append(topic.get_attribute('href'))
-                logger.info(f"Topic added to list: {topic.get_attribute('href')}")
-            visited=False
+    if cfg['Default']["useRSS"] == "false":
+        for cat in cfg['Default']['categoriesToDownload']:
+            url = cfg['Default']['baseURL'] + '/viewforum.php?f='
+            url = url + cat
+            logger.info(f'Trying category {cat}')
+            try:
+                browser.get(url)
+                browser.implicitly_wait(3)
+            except Exception as e:
+                if hasattr(e, 'message'):
+                    logger.error(e.message)
+                else:
+                    logger.error(e)
+                sys.exit(1)
+            topics = browser.find_elements(By.CLASS_NAME,'topictitle')
+            for topic in topics:
+                #timeOfPost = browser.find_element_by_xpath("//time").get_attribute("datetime")
+                for c in completed:
+                    if c==str(topic.get_attribute('href')):
+                        visited=True
+                        completedsave.append(c)
+                        logger.info(f"Topic has already been visited: {c}")
+                if not visited:
+                    topicstovisit.append(topic.get_attribute('href'))
+                    completedsave.append(topic.get_attribute('href'))
+                    logger.info(f"Topic added to list: {topic.get_attribute('href')}")
+                visited=False
     else:
-        #logger.debug(cfgCategories)
-        includedList = cfgInclude.split(",")
-        excludedList = cfgExclude.split(",")
+        includedList = cfg['Default']["include"]
+        excludedList = cfg['Default']["exclude"]
         baseFeedURL = "https://720pier.ru/feed/forum/"
-        for category in cfgCategories:
+        for category in cfg['Default']["categoriesToDownload"]:
             feed = feedparser.parse(baseFeedURL + str(category))
-            #logger.debug(feed)
             for entry in feed.entries:
                 isIncluded = False
                 isExcluded = False
-                #logger.debug(p.parse(entry.published))
-                #logger.debug(entry.link)
-                if cfgSkipOlderThan <= p.parse(entry.published):
-                    if len(cfgInclude) > 0:
+                if pendulum.parse(cfg['Default']["skipOlderThan"]) <= pendulum.parse(entry.published):
+                    if len(cfg['Default']["include"]) > 0:
                         for inc in includedList:
                             if entry.title.find(inc) >= 0:
                                 isIncluded = True
@@ -192,7 +167,7 @@ def getNewTorrents():
                                 isIncluded = True
                     else:
                         isIncluded = True
-                    if len(cfgExclude) > 0:
+                    if len(cfg['Default']["exclude"]) > 0:
                         for exc in includedList:
                             if entry.title.find(exc) >= 0:
                                 isExcluded = True
@@ -207,7 +182,6 @@ def getNewTorrents():
                 else:
                     logger.info("RSS Entry is too old.")
         for topic in topics:
-            #logger.debug(topic)
             for c in completed:
                 if c == topic:
                     visited=True
@@ -223,11 +197,24 @@ def getNewTorrents():
     for topic in topicstovisit:
         browser.get(topic)
         logger.info(f'Trying: {topic}')
-        try:
-            dl = browser.find_element(By.XPATH,'//*[@title="Download torrent"]').click()
-            logger.info(f'Torrent extracted from: {topic}')
-        except NoSuchElementException:
-            logger.info(f"No new Download found in: {str(topic)}")
+        if len(cfg['Default']['skipOlderThan']) > 0:
+            postingDeadline = pendulum.parse(cfg['Default']['skipOlderThan'])
+            timeOfPost = pendulum.parse(browser.find_element(By.TAG_NAME, "time").get_attribute('Datetime'))
+            if timeOfPost >= postingDeadline:
+                try:
+                    dl = browser.find_element(By.XPATH,'//*[@title="Download torrent"]').click()
+                    logger.info(f'Torrent extracted from: {topic}')
+                except NoSuchElementException:
+                    logger.info(f"No new Download found in: {str(topic)}")
+            else:
+                logger.error('Posting is too old.')
+        else:
+            try:
+                dl = browser.find_element(By.XPATH,'//*[@title="Download torrent"]').click()
+                logger.info(f'Torrent extracted from: {topic}')
+            except NoSuchElementException:
+                logger.info(f"No new Download found in: {str(topic)}")
+
 
     #Write completed file
     with open(fileCompleted, "w") as foCompleted:
@@ -238,22 +225,45 @@ def getNewTorrents():
     browser.quit()
     logger.info("Browser closed.")
 
+def sendFilesToQb():
+    newFiles = scanForFiles()
+    qb = Client(cfg["Torrent"]["qbClient"], True, cfg["Torrent"]["basicAuthUsername"], cfg["Torrent"]["basicAuthPassword"])
+    qb.login(cfg["Torrent"]["qbUsername"], cfg["Torrent"]["qbPassword"])
+    newFiles = scanForFiles()
+    for file in newFiles:
+        buffer = open(file, "rb")
+        buffered = buffer.read()
+        try:
+            qb.download_from_file(buffered, category=cfg["Torrent"]["category"], paused=cfg["startPaused"])
+            logger.info(f"{file} sent to QBittorrent.")
+            os.remove(file)
+        except Exception as e:
+            logger.error(e)
+        buffer.close()
 
-if __name__ == "__main__":
-    readFinishedCrawls()
+def main():
     getNewTorrents()
-    if cfgSendToQb == True:
-        newFiles = scanForFiles()
-        qb = Client(cfgQbClient, True, cfgBasicAuthLogin, cfgBasicAuthPassword)
-        qb.login(cfgQbUsername, cfgQbPassword)
-        newFiles = scanForFiles()
-        for file in newFiles:
-            buffer = open(file, "rb")
-            buffered = buffer.read()
-            try:
-                qb.download_from_file(buffered, category=cfgQbCategory, paused=cfgQbDownload)
-                logger.info(f"{file} sent to QBittorrent.")
-                os.remove(file)
-            except Exception as e:
-                logger.error(e)
-            buffer.close()
+    if cfg["Torrent"]["sendToQbittorrent"] == "true":
+        sendFilesToQb()
+    completed = readFinishedCrawls()
+
+
+#Variable Definition
+topics = list()
+topicstovisit = list()
+completedsave = list()
+completed = list()
+fileCompleted = "completed.txt"
+today = pendulum.now()
+cfg = dict()
+
+logger.add("720pdl.log", format="{time} - {level} - {message}")
+
+cfg = loadOrCreateCfgfile()
+completed = readFinishedCrawls()
+
+schedule.every(5).minutes.do(main)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
