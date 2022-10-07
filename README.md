@@ -1,5 +1,4 @@
 # 720dl
-# V2 - WORK IN PROGRESS
 
 Webcrawler for 720pier.ru which downloads torrentfiles from a given overview (seachresult, Category etc.) link or from RSS-Feeds.
 Doesn't re-download old torrents. Can include or exclude searchterms and old rss entries.
@@ -9,7 +8,8 @@ Doesn't re-download old torrents. Can include or exclude searchterms and old rss
 - Python >= 3.10
 
 ## Features:
-- Monitor 720pier.ru for new torrents
+- Monitor 720pier.ru Website for new torrents
+- Monitor 720pier.ru RSS feeds for new torrents
 - Downloads the torrent files
 - Send torrents to QBittorrent
 
