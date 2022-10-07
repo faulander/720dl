@@ -46,9 +46,6 @@ def loadOrCreateCfgfile():
         c['Torrent']['basicAuthUsername'] = ''  # Basic Auth
         c['Torrent']['basicAuthPassword'] = '' # Basic Auth
         c['Torrent']['startPaused'] = True  # Start Downloads immediately (yes/no)
-        c['CategoriesRatio'] = {
-            '720pier': {'stopAtRatio': -1, 'stopAtSeedingTime': -1},
-            }
         with open('720pier.ini.yml', "w") as ini:
             yaml.dump(c, ini, default_flow_style=False, sort_keys=False)
         logger.error('Default config file created. Please adapt!')
@@ -240,10 +237,11 @@ def sendFilesToQb():
         except Exception as e:
             logger.error(e)
         buffer.close()
+    qb.logout()
 
 def main():
     getNewTorrents()
-    if cfg["Torrent"]["sendToQbittorrent"] == "true":
+    if cfg["Torrent"]["sendToQBittorrent"] == "true":
         sendFilesToQb()
     completed = readFinishedCrawls()
 
@@ -262,8 +260,10 @@ logger.add("720pdl.log", format="{time} - {level} - {message}")
 cfg = loadOrCreateCfgfile()
 completed = readFinishedCrawls()
 
-schedule.every(5).minutes.do(main)
+#schedule.every(5).minutes.do(main)
 
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+#while True:
+#    schedule.run_pending()
+#    time.sleep(1)
+
+main()
