@@ -45,7 +45,6 @@ def loadOrCreateCfgfile():
         c['Torrent']['qbPassword'] = 'admin'  # Password to qBittorrent Client
         c['Torrent']['basicAuthUsername'] = ''  # Basic Auth
         c['Torrent']['basicAuthPassword'] = '' # Basic Auth
-        c['Torrent']['startPaused'] = True  # Start Downloads immediately (yes/no)
         with open('720pier.ini.yml', "w") as ini:
             yaml.dump(c, ini, default_flow_style=False, sort_keys=False)
         logger.error('Default config file created. Please adapt!')
@@ -231,7 +230,7 @@ def sendFilesToQb():
         buffer = open(file, "rb")
         buffered = buffer.read()
         try:
-            qb.download_from_file(buffered, category=cfg["Torrent"]["category"], paused=cfg["startPaused"])
+            qb.download_from_file(buffered, category=cfg["Torrent"]["category"], paused=False)
             logger.info(f"{file} sent to QBittorrent.")
             os.remove(file)
         except Exception as e:
