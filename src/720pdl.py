@@ -259,10 +259,10 @@ logger.add("720pdl.log", format="{time} - {level} - {message}")
 cfg = loadOrCreateCfgfile()
 completed = readFinishedCrawls()
 
-#schedule.every(5).minutes.do(main)
+schedule.every(5).minutes.do(main)
 
-#while True:
-#    schedule.run_pending()
-#    time.sleep(1)
+while True:
+    schedule.run_pending()
+    time.sleep(1)
 
-main()
+#main()
