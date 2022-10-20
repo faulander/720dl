@@ -164,7 +164,7 @@ def getNewTorrents():
                     else:
                         isIncluded = True
                     if len(cfg['Default']["exclude"]) > 0:
-                        for exc in includedList:
+                        for exc in excludedList:
                             if entry.title.find(exc) >= 0:
                                 isExcluded = True
                                 logger.info(f"Excluded '{exc}' has been found in Title: '{entry.title}'")
