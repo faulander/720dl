@@ -21,9 +21,8 @@ def loadOrCreateCfgfile():
     if os.path.isfile('720pier.ini.yml'):
         with open('720pier.ini.yml', "r") as ini:
             c = yaml.load(ini, Loader=BaseLoader)
-            #logger.debug(c)
-        return c
         logger.info("INI File loaded")
+        return c
     else:
         c = dict()
         c['Default'] = dict()
@@ -68,8 +67,8 @@ def scanForFiles():
     for file in files:
         if file.endswith('.torrent'):
             setOfFiles.add(os.path.join(os.path.abspath(os.path.dirname(__file__)), file))
-    return setOfFiles
     logger.info("Scan for torrent files locally completed")
+    return setOfFiles
     
 def getNewTorrents():
     visited = bool
@@ -182,7 +181,7 @@ def getNewTorrents():
                 if c == topic:
                     visited=True
                     completedsave.append(c)
-                    logger.info(f"Topic has already been visited: {c}")
+                    #logger.info(f"Topic has already been visited: {c}")
             if not visited:
                 topicstovisit.append(topic)
                 completedsave.append(topic)

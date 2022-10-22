@@ -10,6 +10,7 @@ Doesn't re-download old torrents. Can include or exclude searchterms and old ent
 
 - Monitor 720pier.ru Website for new torrents
 - Monitor 720pier.ru RSS feeds for new torrents
+- can handle include and exclude lists
 - Downloads the torrent files
 - Send torrents to QBittorrent
 
@@ -24,3 +25,8 @@ Doesn't re-download old torrents. Can include or exclude searchterms and old ent
 ## Docker
 
 - If you know what you are doing, the Dockerfile is included
+
+## PM2
+
+- pm2 start 720pdl.py --name 720pier --interpreter=.venv/bin/python3
+

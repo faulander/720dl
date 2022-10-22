@@ -3,6 +3,7 @@
 .pdm.toml
 *.torrent
 *.yml
+TEST.py
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,venv,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,venv,visualstudiocode
