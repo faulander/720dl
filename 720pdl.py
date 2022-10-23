@@ -5,7 +5,6 @@ from loguru import logger
 import pendulum
 import feedparser
 import yaml
-import schedule
 import time
 from yaml.loader import BaseLoader
 from selenium.webdriver.firefox.options import Options
@@ -54,7 +53,7 @@ def readFinishedCrawls():
     try:
         with open(fileCompleted, "r") as foCompleted:
             for line in foCompleted:
-                completed.append(line.rstrip())
+                completed.add(line.rstrip())
         return completed
     except FileNotFoundError:
         open(fileCompleted, "x")
@@ -135,11 +134,11 @@ def getNewTorrents():
                 for c in completed:
                     if c==str(topic.get_attribute('href')):
                         visited=True
-                        completedsave.append(c)
+                        completedsave.add(c)
                         logger.info(f"Topic has already been visited: {c}")
                 if not visited:
-                    topicstovisit.append(topic.get_attribute('href'))
-                    completedsave.append(topic.get_attribute('href'))
+                    topicstovisit.add(topic.get_attribute('href'))
+                    completedsave.add(topic.get_attribute('href'))
                     logger.info(f"Topic added to list: {topic.get_attribute('href')}")
                 visited=False
     else:
@@ -180,11 +179,11 @@ def getNewTorrents():
             for c in completed:
                 if c == topic:
                     visited=True
-                    completedsave.append(c)
+                    completedsave.add(c)
                     #logger.info(f"Topic has already been visited: {c}")
             if not visited:
-                topicstovisit.append(topic)
-                completedsave.append(topic)
+                topicstovisit.add(topic)
+                completedsave.add(topic)
                 logger.info(f"Topic added to list: {topic}")
             visited=False
 
@@ -213,7 +212,7 @@ def getNewTorrents():
 
     #Write completed file
     with open(fileCompleted, "w") as foCompleted:
-        for i in reversed(completedsave):
+        for i in completedsave:
             foCompleted.writelines(i + "\n")
     foCompleted.close()
 
@@ -238,30 +237,25 @@ def sendFilesToQb():
     qb.logout()
 
 def main():
+    today = pendulum.now()
+    completed = readFinishedCrawls()
     getNewTorrents()
     if cfg["Torrent"]["sendToQBittorrent"] == "true":
         sendFilesToQb()
-    completed = readFinishedCrawls()
 
 
 #Variable Definition
-topics = list()
-topicstovisit = list()
-completedsave = list()
-completed = list()
+topics = set()
+topicstovisit = set()
+completedsave = set()
+completed = set()
 fileCompleted = "completed.txt"
-today = pendulum.now()
 cfg = dict()
 
 logger.add("720pdl.log", format="{time} - {level} - {message}")
 
 cfg = loadOrCreateCfgfile()
-completed = readFinishedCrawls()
-
-schedule.every(5).minutes.do(main)
 
 while True:
-    schedule.run_pending()
-    time.sleep(1)
-
-#main()
+    main()
+    time.sleep(300)
