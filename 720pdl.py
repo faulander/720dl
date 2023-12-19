@@ -17,6 +17,7 @@ from qbclient import Client
 
 
 def loadOrCreateCfgfile():
+    today = pendulum.now()  # Define today using Pendulum
     if os.path.isfile('720pier.ini.yml'):
         with open('720pier.ini.yml', "r") as ini:
             c = yaml.load(ini, Loader=BaseLoader)
